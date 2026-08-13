@@ -1,0 +1,7 @@
+pymongo>=4.13
+langchain>=0.3
+langchain-mongodb>=0.6
+langchain-openai>=0.3
+langgraph>=0.6
+python-dotenv>=1.1
+elevenlabs>=1.50
