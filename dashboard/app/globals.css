@@ -33,6 +33,8 @@ button { font: inherit; }
 .status-pill { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 13px; border-radius: 18px; border: 1px solid #dfe6ef; background: #f8fafc; color: #516b8d; font: 12px var(--font-geist-mono); }
 .status-pill.live { color: #008b5c; border-color: #a7efd0; background: #ecfff6; font-family: var(--font-geist-sans); font-weight: 600; }
 .status-pill i { width: 8px; height: 8px; border-radius: 50%; background: #62d9ad; }
+.status-pill.demo { color: #a65608; border-color: #f2c58f; background: #fff7e9; font-family: var(--font-geist-sans); font-weight: 600; }
+.status-pill.demo i { background: #e59434; }
 .clock { margin-left: 8px; padding: 10px 14px; border: 1px solid #e0e6ee; border-radius: 9px; color: #8496b1; font: 13px var(--font-geist-mono); }
 .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg,#0a8ee7,#6839cf); color: white; font: 600 13px var(--font-geist-mono); }
 
