@@ -40,6 +40,8 @@ def make_run_experiment(
 
         return {
             "previous_metrics": dict(state.get("current_metrics") or {}),
+            "previous_confusion_matrix": state.get("confusion_matrix") or {},
+            "previous_per_class_metrics": dict(state.get("per_class_metrics") or {}),
             "current_config": new_config,
             "current_model_id": model_id,
             "pending_experiment_id": experiment_id,
@@ -85,6 +87,8 @@ def make_evaluate_result(
             "current_config": current_config,
             "confusion_matrix": normalized["confusion_matrix"],
             "per_class_metrics": normalized["per_class_metrics"],
+            "training_history": normalized["training_history"],
+            "misclassified_examples": normalized["misclassified_examples"],
             "last_metric_delta": delta,
             "last_experiment_helped": helped,
             "best_metrics": best_metrics,

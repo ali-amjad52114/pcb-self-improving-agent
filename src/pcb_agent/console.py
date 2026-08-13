@@ -169,17 +169,30 @@ def print_run_complete(
     best = metric_value(state.get("best_metrics"), metric)
     history = state.get("experiment_history") or []
     lessons_used = sum(len(h.get("memory_used") or []) for h in history)
+    retrieved_ids = {
+        str(item)
+        for h in history
+        for item in (h.get("memory_used") or [])
+    }
     budget = int(state.get("experiment_budget") or 0)
+    final_test = metric_value(state.get("final_test_metrics"), metric)
+    successful = sum(1 for h in history if h.get("helped"))
     _safe_print(
         "\n+================ RUN COMPLETE =================+\n"
         f"Run                  {state.get('run_id')}\n"
         f"Stop reason           {state.get('stop_reason')}\n"
         f"Baseline macro F1     {baseline:.3f}\n"
         f"Best macro F1         {best:.3f}\n"
+        f"Final test macro F1   {final_test:.3f}\n"
         f"Experiments used      {len(history)} / {budget}\n"
-        f"Memory lessons used   {lessons_used}\n"
+        f"Successful            {successful}\n"
+        f"Failed                {len(history) - successful}\n"
+        f"Memory mode           {str(state.get('memory_mode') or 'memory').upper()}\n"
+        f"Memory lessons used   {lessons_used} ({len(retrieved_ids)} unique)\n"
         f"OpenRouter calls      {int(state.get('openrouter_calls') or 0)}\n"
         f"Checkpoint backend    {checkpoint_backend}\n"
+        f"Target reached        {'YES' if state.get('stop_reason') == 'target_reached' else 'NO'}\n"
+        f"Best configuration    {state.get('best_config') or {}}\n"
         "+================================================+"
     )
     if fake_mode:

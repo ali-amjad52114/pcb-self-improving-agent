@@ -233,6 +233,11 @@ class FakeReasoning:
             "parameters": parameters,
             "expected_effect": defaults["expected_effect"],
             "confidence": confidence,
+            "memory_used": [
+                str(m.get("lesson_id") or m.get("experiment_id") or index)
+                for index, m in enumerate(memories)
+                if memory_confirmed and _intervention_action(m) == chosen and _helped(m)
+            ],
         }
 
     def critique_result(self, before: dict, after: dict, action: dict) -> dict:

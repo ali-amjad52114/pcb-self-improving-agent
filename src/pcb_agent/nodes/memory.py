@@ -19,15 +19,16 @@ def make_retrieve_memory(
         warnings = list(state.get("warnings") or [])
         query = build_memory_query(state)
         lessons: list[dict[str, Any]] = []
-        try:
-            raw = deps.memory.retrieve_similar_lessons(
-                query=query,
-                k=settings.memory_top_k,
-            )
-            lessons = [dict(x) for x in (raw or [])]
-        except Exception as exc:  # recoverable
-            warnings.append(f"memory_retrieval_failed: {exc}")
-            lessons = []
+        if str(state.get("memory_mode") or "memory").lower() != "cold":
+            try:
+                raw = deps.memory.retrieve_similar_lessons(
+                    query=query,
+                    k=settings.memory_top_k,
+                )
+                lessons = [dict(x) for x in (raw or [])]
+            except Exception as exc:  # recoverable
+                warnings.append(f"memory_retrieval_failed: {exc}")
+                lessons = []
 
         iteration = int(state.get("iteration") or 0)
         console.print_iteration_header(iteration + 1)

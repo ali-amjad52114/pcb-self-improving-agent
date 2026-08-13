@@ -44,7 +44,7 @@ def _id(prefix: str) -> str:
 
 class AgentMemory:
     def __init__(self, db: Database | None = None):
-        self.db = db or get_db()
+        self.db = db if db is not None else get_db()
         self.experiments = self.db["experiments"]
         self.lessons = self.db["lessons"]
         self.run_summaries = self.db["run_summaries"]

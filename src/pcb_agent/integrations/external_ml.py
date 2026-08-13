@@ -27,6 +27,16 @@ class ExternalMLAdapter:
     def apply_experiment(self, current_config: dict, proposal: dict) -> dict:
         return self._module.apply_experiment(current_config, proposal)
 
+    def get_dataset_summary(self, config: dict) -> dict:
+        helper = getattr(self._module, "get_dataset_summary", None)
+        return dict(helper(config)) if callable(helper) else {}
+
+    def evaluate_test(self, config: dict) -> dict:
+        helper = getattr(self._module, "evaluate_test", None)
+        if not callable(helper):
+            return {}
+        return dict(helper(config))
+
 
 def load_ml_adapter(module_path: str) -> ExternalMLAdapter:
     if not module_path:

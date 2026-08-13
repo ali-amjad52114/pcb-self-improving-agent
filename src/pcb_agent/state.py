@@ -28,8 +28,15 @@ class AgentState(TypedDict, total=False):
     current_metrics: dict[str, Any]
     best_metrics: dict[str, Any]
 
-    confusion_matrix: dict[str, Any]
+    confusion_matrix: dict[str, Any] | list[list[int]]
     per_class_metrics: dict[str, Any]
+    previous_confusion_matrix: dict[str, Any] | list[list[int]]
+    previous_per_class_metrics: dict[str, Any]
+    training_history: dict[str, Any]
+    misclassified_examples: list[dict[str, Any]]
+
+    memory_mode: str
+    final_test_metrics: dict[str, Any]
 
     memory_query: str
     retrieved_lessons: list[dict[str, Any]]

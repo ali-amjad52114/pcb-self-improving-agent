@@ -46,6 +46,8 @@ def _initial_state(
     run_id: str,
     settings: Settings,
     config: dict[str, Any],
+    dataset_summary: dict[str, Any] | None = None,
+    memory_mode: str = "memory",
 ) -> AgentState:
     return {
         "run_id": run_id,
@@ -53,10 +55,7 @@ def _initial_state(
         "experiment_budget": settings.experiment_budget,
         "target_metric": settings.target_metric,
         "target_value": settings.target_value,
-        "dataset_summary": {
-            "class_imbalance_ratio": 5.4,
-            "minority_class": "open_circuit",
-        },
+        "dataset_summary": dataset_summary or {},
         "current_config": config,
         "best_config": config,
         "current_model_id": "",
@@ -84,6 +83,12 @@ def _initial_state(
         "pending_experiment_id": "",
         "openrouter_calls": 0,
         "judge_skipped": False,
+        "memory_mode": memory_mode,
+        "training_history": {},
+        "misclassified_examples": [],
+        "previous_confusion_matrix": {},
+        "previous_per_class_metrics": {},
+        "final_test_metrics": {},
     }
 
 
@@ -105,6 +110,11 @@ def start(
         dir_okay=False,
         help="Baseline training config JSON",
     ),
+    mode: str = typer.Option(
+        "memory",
+        "--mode",
+        help="Memory retrieval mode: cold or memory",
+    ),
 ) -> None:
     """Start a new experiment campaign (thread_id == run_id)."""
     try:
@@ -113,8 +123,25 @@ def start(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc
 
+    mode = mode.lower().strip()
+    if mode not in {"cold", "memory"}:
+        typer.secho("--mode must be 'cold' or 'memory'", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+
     baseline = _load_baseline_config(config)
-    initial = _initial_state(run_id=run_id, settings=settings, config=baseline)
+    dataset_summary_getter = getattr(deps.ml, "get_dataset_summary", None)
+    dataset_summary = (
+        dict(dataset_summary_getter(baseline))
+        if callable(dataset_summary_getter)
+        else {}
+    )
+    initial = _initial_state(
+        run_id=run_id,
+        settings=settings,
+        config=baseline,
+        dataset_summary=dataset_summary,
+        memory_mode=mode,
+    )
     thread_config = {"configurable": {"thread_id": run_id}}
 
     console.print_run_banner(run_id)
@@ -129,6 +156,18 @@ def start(
     except KeyboardInterrupt:
         console.print_interrupted(run_id)
         raise typer.Exit(code=130) from None
+
+    test_evaluator = getattr(deps.ml, "evaluate_test", None)
+    if callable(test_evaluator) and settings.agent_mode == "integrated":
+        try:
+            test_result = dict(test_evaluator(dict(final_state.get("best_config") or baseline)))
+            final_state["final_test_metrics"] = dict(
+                test_result.get("metrics") or test_result
+            )
+        except Exception as exc:
+            warnings = list(final_state.get("warnings") or [])
+            warnings.append(f"final_test_evaluation_failed: {exc}")
+            final_state["warnings"] = warnings
 
     console.print_run_complete(
         final_state,  # type: ignore[arg-type]

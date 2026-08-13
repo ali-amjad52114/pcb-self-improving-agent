@@ -3,8 +3,12 @@
   "learning_rate": 0.001,
   "batch_size": 32,
   "image_size": 224,
+  "epochs": 3,
   "augmentation": "basic",
   "sampler": "random",
   "class_weights": null,
-  "confidence_threshold": 0.5
+  "confidence_threshold": 0.5,
+  "dataset_manifest": "data/pcb_splits.json",
+  "model_dir": "data/models",
+  "seed": 42
 }

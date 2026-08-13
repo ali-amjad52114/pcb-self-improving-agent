@@ -15,7 +15,7 @@ EXPERIMENT_VALIDATOR = {
             "dataset_stats": {"bsonType": "object"},
             "model_config": {"bsonType": "object"},
             "metrics": {"bsonType": "object"},
-            "confusion_matrix": {"bsonType": "object"},
+            "confusion_matrix": {"bsonType": ["object", "array"]},
             "failure_signature": {"bsonType": "object"},
             "intervention": {"bsonType": "object"},
             "outcome_delta": {"bsonType": "object"},

@@ -55,7 +55,7 @@ def make_propose_experiment(
             for m in (state.get("retrieved_lessons") or [])
             if m.get("run_id") not in (None, "", run_id)
         ]
-        memory_changed = bool(prior_lessons)
+        memory_changed = bool(proposal.get("memory_used"))
         console.print_experiment(proposal, memory_changed=memory_changed)
 
         reason = proposal_judge_reason({**state, "proposed_experiment": proposal})

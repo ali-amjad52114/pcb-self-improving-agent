@@ -40,6 +40,9 @@ def make_store_experience(
             "model_config": state.get("current_config") or {},
             "metrics": state.get("current_metrics") or {},
             "previous_metrics": state.get("previous_metrics") or {},
+            "confusion_matrix": state.get("confusion_matrix") or {},
+            "training_history": state.get("training_history") or {},
+            "misclassified_examples": state.get("misclassified_examples") or [],
             "failure_signature": {
                 "per_class_metrics": state.get("per_class_metrics") or {},
                 "memory_query": state.get("memory_query") or "",
@@ -96,11 +99,7 @@ def make_store_experience(
                 if not experiment_stored:
                     warnings.append("memory_storage_failed_entirely")
 
-        retrieved = state.get("retrieved_lessons") or []
-        memory_used = [
-            str(lesson.get("lesson_id") or lesson.get("experiment_id") or idx)
-            for idx, lesson in enumerate(retrieved)
-        ]
+        memory_used = [str(item) for item in (proposal.get("memory_used") or [])]
 
         history = list(state.get("experiment_history") or [])
         history.append(

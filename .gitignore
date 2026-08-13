@@ -7,4 +7,7 @@ __pycache__/
 .python-version
 dist/
 data/fake_memory.json
+data/models/
+data/pcb_crops/
+data/pcb_splits.json
 .DS_Store

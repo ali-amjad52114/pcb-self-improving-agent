@@ -16,6 +16,7 @@ ALLOWED_ACTIONS = {
     "change_sampler",
     "change_class_weights",
     "change_confidence_threshold",
+    "increase_epochs",
 }
 
 JUDGE_FALLBACK: dict[str, Any] = {
@@ -96,10 +97,18 @@ def normalize_metrics(raw: dict[str, Any] | None) -> dict[str, Any]:
         metrics["macro_f1"] = raw["macro_f1"]
     if "accuracy" not in metrics and "accuracy" in raw:
         metrics["accuracy"] = raw["accuracy"]
+    confusion_matrix = raw.get("confusion_matrix") or {}
+    if not isinstance(confusion_matrix, (dict, list)):
+        confusion_matrix = {}
+    per_class_metrics = raw.get("per_class_metrics") or {}
+    if not isinstance(per_class_metrics, dict):
+        per_class_metrics = {}
     return {
         "metrics": metrics,
-        "confusion_matrix": dict(raw.get("confusion_matrix") or {}),
-        "per_class_metrics": dict(raw.get("per_class_metrics") or {}),
+        "confusion_matrix": confusion_matrix,
+        "per_class_metrics": per_class_metrics,
+        "training_history": dict(raw.get("training_history") or {}),
+        "misclassified_examples": list(raw.get("misclassified_examples") or []),
     }
 
 
@@ -143,6 +152,9 @@ def normalize_proposal(raw: dict[str, Any] | None) -> dict[str, Any]:
             f"Invalid next_action={next_action!r}. "
             f"Allowed: {sorted(ALLOWED_ACTIONS)}"
         )
+    memory_used = raw.get("memory_used") or []
+    if not isinstance(memory_used, list):
+        memory_used = []
     return {
         "diagnosis": str(raw.get("diagnosis") or ""),
         "hypothesis": str(raw.get("hypothesis") or ""),
@@ -150,6 +162,7 @@ def normalize_proposal(raw: dict[str, Any] | None) -> dict[str, Any]:
         "parameters": parameters,
         "expected_effect": str(raw.get("expected_effect") or ""),
         "confidence": confidence,
+        "memory_used": [str(item) for item in memory_used],
     }
 
 

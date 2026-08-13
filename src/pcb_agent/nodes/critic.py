@@ -14,8 +14,18 @@ def make_critique_result(
 ) -> Callable[[AgentState], dict[str, Any]]:
     def critique_result(state: AgentState) -> dict[str, Any]:
         raw = deps.reasoning.critique_result(
-            before=dict(state.get("previous_metrics") or {}),
-            after=dict(state.get("current_metrics") or {}),
+            before={
+                "metrics": dict(state.get("previous_metrics") or {}),
+                "per_class_metrics": dict(
+                    state.get("previous_per_class_metrics") or {}
+                ),
+                "confusion_matrix": state.get("previous_confusion_matrix") or {},
+            },
+            after={
+                "metrics": dict(state.get("current_metrics") or {}),
+                "per_class_metrics": dict(state.get("per_class_metrics") or {}),
+                "confusion_matrix": state.get("confusion_matrix") or {},
+            },
             action=dict(state.get("proposed_experiment") or {}),
         )
         critique = normalize_critique(

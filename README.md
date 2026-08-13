@@ -82,26 +82,37 @@ python -m pcb_agent.runner start --run-id run_cold_001 --config .\configs\baseli
 
 ## Integrated mode
 
-Set these values in `.env` after Person 2 supplies their modules:
+Prepare the real Kaggle dataset once:
+
+```powershell
+python -m scripts.prepare_pcb_dataset
+```
+
+This downloads `akhatova/pcb-defects`, creates leakage-safe bounding-box crops,
+and writes deterministic train/validation/test splits to `data/pcb_splits.json`.
+
+Set these values in `.env`:
 
 ```env
 AGENT_MODE=integrated
 MEMORY_MODULE=pcb_memory.memory
-ML_MODULE=<person-2-ml-module>
-REASONING_MODULE=<person-2-reasoning-module>
+ML_MODULE=pcb_agent.integrations.pcb_ml
+REASONING_MODULE=fireworks
 
 CHECKPOINTER_BACKEND=mongodb
 MONGODB_DB=persistent_context
 MONGODB_DB_NAME=persistent_context
 
 OPENROUTER_ENABLED=true
-OPENROUTER_MODEL=<model-name>
+OPENROUTER_MODEL=openrouter/free
+LANGCHAIN_TRACING_V2=false
 ```
 
 Then run:
 
 ```powershell
-python -m pcb_agent.runner start --run-id integrated_001
+python -m pcb_agent.runner start --run-id cold_001 --mode cold
+python -m pcb_agent.runner start --run-id memory_001 --mode memory
 ```
 
 The graph, routing, and state do not change when switching from fakes to real

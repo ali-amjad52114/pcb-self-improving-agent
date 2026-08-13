@@ -31,7 +31,12 @@ from pcb_agent.state import AgentState
 def build_graph(deps: AgentDependencies, checkpointer: Any, settings: Settings):
     """Wire nodes and conditional edges. Dependencies are closed over, not in state."""
 
-    openrouter_enabled = bool(settings.openrouter_enabled) and settings.agent_mode != "fake"
+    openrouter_enabled = (
+        bool(settings.openrouter_enabled)
+        and bool(settings.openrouter_api_key)
+        and bool(settings.openrouter_model)
+        and settings.agent_mode != "fake"
+    )
 
     graph = StateGraph(AgentState)
 

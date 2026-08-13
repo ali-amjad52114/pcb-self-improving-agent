@@ -43,6 +43,8 @@ def make_evaluate_baseline(
             "current_config": config,
             "confusion_matrix": normalized["confusion_matrix"],
             "per_class_metrics": normalized["per_class_metrics"],
+            "training_history": normalized["training_history"],
+            "misclassified_examples": normalized["misclassified_examples"],
             "status": "baseline_evaluated",
             "iteration": int(state.get("iteration") or 0),
             "experiment_history": list(state.get("experiment_history") or []),

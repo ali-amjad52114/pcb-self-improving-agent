@@ -26,10 +26,12 @@ def get_checkpointer(settings: Settings) -> Any:
                 "Set MONGODB_URI or explicitly switch CHECKPOINTER_BACKEND=memory."
             )
         try:
-            from pymongo import MongoClient
             from langgraph.checkpoint.mongodb import MongoDBSaver
+            from pcb_memory.client import get_client
 
-            client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
+            # Reuse Person 1's process-wide pooled client rather than opening a
+            # second Atlas connection for checkpoints.
+            client = get_client()
             # Fail clearly if the cluster is unreachable.
             client.admin.command("ping")
             return MongoDBSaver(
