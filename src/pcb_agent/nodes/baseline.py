@@ -50,6 +50,12 @@ def make_evaluate_baseline(
             "consecutive_failures": int(state.get("consecutive_failures") or 0),
             "proposal_revision_count": 0,
             "openrouter_calls": int(state.get("openrouter_calls") or 0),
+            "openrouter_call_budget": int(
+                state.get("openrouter_call_budget")
+                or 5
+            ),
+            "openrouter_ledger": list(state.get("openrouter_ledger") or []),
+            "judge_skip_reason": str(state.get("judge_skip_reason") or ""),
         }
         merged = {**state, **updates}
         console.print_baseline(merged)  # type: ignore[arg-type]

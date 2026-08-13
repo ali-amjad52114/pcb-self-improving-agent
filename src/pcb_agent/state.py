@@ -59,4 +59,7 @@ class AgentState(TypedDict, total=False):
     # Orchestrator bookkeeping (still JSON-safe)
     pending_experiment_id: str
     openrouter_calls: int
+    openrouter_call_budget: int
+    openrouter_ledger: list[dict[str, Any]]
     judge_skipped: bool
+    judge_skip_reason: str

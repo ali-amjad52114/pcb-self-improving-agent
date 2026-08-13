@@ -107,21 +107,40 @@ python -m pcb_agent.runner start --run-id integrated_001
 The graph, routing, and state do not change when switching from fakes to real
 teammate modules.
 
-## OpenRouter policy
+## OpenRouter policy (deep judge panel)
 
 Person 3 calls the independent judge only for low confidence, repeated failures,
 model-family changes, or final lesson validation. Failures fall back safely so
 the experiment loop can continue.
 
+Deep integration features:
+
+- **Multi-model panel** via `OPENROUTER_MODEL` / `_SECONDARY` / `_TERTIARY` with consensus merge
+- **Richer structured opinion** (evidence citations, suggested allowed action family, lesson quality)
+- **Hard call budget** via `OPENROUTER_CALL_BUDGET` + JSON-safe `openrouter_ledger` in state
+- **Format ladder**: strict `json_schema` → `json_object` → secondary model → safe fallback
+- **Smoke without full ML loop**:
+
+```powershell
+uv run python -m pcb_agent.runner judge-smoke --fixture .\fixtures\judge_context.json
+```
+
+Fake teammates + live judge:
+
+```env
+AGENT_MODE=fake
+OPENROUTER_ENABLED=true
+OPENROUTER_API_KEY=<key>
+OPENROUTER_MODEL=<model>
+OPENROUTER_MODEL_SECONDARY=<optional>
+OPENROUTER_CALL_BUDGET=5
+```
+
 ## Setup and tests
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -e .
-pip install -r requirements.txt
-python -m unittest discover -s tests -v
-pytest -q
+uv sync
+uv run pytest -q
 ```
 
 The real build must use the Atlas Hackathon Sandbox. Never commit `.env`.

@@ -200,10 +200,19 @@ class FakeReasoning:
             and prev.get("next_action")
             and revision >= 1
         ):
-            for action in candidate_order:
-                if action != prev.get("next_action") and action not in tried:
-                    chosen = action
-                    break
+            suggested = str(opinion.get("suggested_action_family") or "")
+            if (
+                suggested
+                and suggested in ACTION_DEFAULTS
+                and suggested != prev.get("next_action")
+                and suggested not in tried
+            ):
+                chosen = suggested
+            else:
+                for action in candidate_order:
+                    if action != prev.get("next_action") and action not in tried:
+                        chosen = action
+                        break
 
         defaults = ACTION_DEFAULTS[chosen]
         confidence = 0.81

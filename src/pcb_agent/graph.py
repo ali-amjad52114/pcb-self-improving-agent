@@ -31,7 +31,8 @@ from pcb_agent.state import AgentState
 def build_graph(deps: AgentDependencies, checkpointer: Any, settings: Settings):
     """Wire nodes and conditional edges. Dependencies are closed over, not in state."""
 
-    openrouter_enabled = bool(settings.openrouter_enabled) and settings.agent_mode != "fake"
+    # Allow real OpenRouter judge even in AGENT_MODE=fake (smoke path).
+    openrouter_enabled = bool(settings.openrouter_enabled)
 
     graph = StateGraph(AgentState)
 
@@ -42,14 +43,14 @@ def build_graph(deps: AgentDependencies, checkpointer: Any, settings: Settings):
     graph.add_node("propose_experiment", make_propose_experiment(deps))
     graph.add_node(
         "judge_proposal",
-        make_judge_proposal(deps, openrouter_enabled=openrouter_enabled),
+        make_judge_proposal(deps, settings, openrouter_enabled=openrouter_enabled),
     )
     graph.add_node("run_experiment", make_run_experiment(deps))
     graph.add_node("evaluate_result", make_evaluate_result(deps))
     graph.add_node("critique_result", make_critique_result(deps))
     graph.add_node(
         "judge_lesson",
-        make_judge_lesson(deps, openrouter_enabled=openrouter_enabled),
+        make_judge_lesson(deps, settings, openrouter_enabled=openrouter_enabled),
     )
     graph.add_node("store_experience", make_store_experience(deps))
 

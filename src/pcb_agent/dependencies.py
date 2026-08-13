@@ -17,26 +17,29 @@ class AgentDependencies:
 
 
 def build_dependencies(settings: Settings) -> AgentDependencies:
-    """Build ports from AGENT_MODE and teammate module env vars."""
+    """Build ports from AGENT_MODE and teammate module env vars.
+
+    Special case: AGENT_MODE=fake + OPENROUTER_ENABLED=true uses fake
+    Memory/ML/Reasoning with a real OpenRouter judge (smoke path).
+    """
+    from pcb_agent.integrations.openrouter_judge import build_judge
+
     if settings.agent_mode == "fake":
-        from pcb_agent.fakes.judge import FakeJudgeAdapter
         from pcb_agent.fakes.memory import FakeMemory
         from pcb_agent.fakes.ml import FakeML
         from pcb_agent.fakes.reasoning import FakeReasoning
 
         # [FALLBACK ONLY — FINAL DEMO SHOULD USE MONGODB]
-        # File persistence lets cold→warm CLI demos share lessons locally.
         return AgentDependencies(
             memory=FakeMemory(persist_path="data/fake_memory.json"),
             ml=FakeML(),
             reasoning=FakeReasoning(),
-            judge=FakeJudgeAdapter(),
+            judge=build_judge(settings),
         )
 
     from pcb_agent.integrations.external_memory import load_memory_adapter
     from pcb_agent.integrations.external_ml import load_ml_adapter
     from pcb_agent.integrations.external_reasoning import load_reasoning_adapter
-    from pcb_agent.integrations.openrouter_judge import build_judge
 
     return AgentDependencies(
         memory=load_memory_adapter(settings.memory_module),

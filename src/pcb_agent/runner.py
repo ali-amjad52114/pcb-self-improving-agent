@@ -83,7 +83,10 @@ def _initial_state(
         "warnings": [],
         "pending_experiment_id": "",
         "openrouter_calls": 0,
+        "openrouter_call_budget": settings.openrouter_call_budget,
+        "openrouter_ledger": [],
         "judge_skipped": False,
+        "judge_skip_reason": "",
     }
 
 
@@ -198,6 +201,47 @@ def status(
     typer.echo(f"stop_reason={values.get('stop_reason')}")
     typer.echo(f"next={snap.next}")
     typer.echo(f"checkpointer={settings.checkpointer_backend}")
+
+
+@app.command("judge-smoke")
+def judge_smoke(
+    fixture: Path = typer.Option(
+        Path("fixtures/judge_context.json"),
+        "--fixture",
+        exists=False,
+        dir_okay=False,
+        help="JSON context for a single second_opinion call",
+    ),
+) -> None:
+    """Smoke-test OpenRouter judge without running the full ML loop.
+
+    Uses settings from .env. With OPENROUTER_ENABLED=false this exercises FakeJudge.
+    With OPENROUTER_ENABLED=true and keys set, this makes a live panel call.
+    """
+    settings = get_settings()
+    from pcb_agent.integrations.openrouter_judge import build_judge
+
+    if not fixture.exists():
+        typer.secho(f"Fixture not found: {fixture}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    context = json.loads(fixture.read_text(encoding="utf-8"))
+    context["_openrouter_calls"] = 0
+    context["_openrouter_budget"] = settings.openrouter_call_budget
+
+    judge = build_judge(settings)
+    typer.echo(
+        f"judge={type(judge).__name__} enabled={settings.openrouter_enabled} "
+        f"models={settings.openrouter_models()} budget={settings.openrouter_call_budget}"
+    )
+    opinion = judge.second_opinion(context)
+    console.print_judge_result(
+        str(context.get("trigger") or "smoke"),
+        opinion,
+        calls=int(opinion.get("_calls_made") or getattr(judge, "call_count", 0)),
+        budget=settings.openrouter_call_budget,
+    )
+    typer.echo(json.dumps({k: v for k, v in opinion.items() if not str(k).startswith("_")}, indent=2))
 
 
 def main() -> None:
