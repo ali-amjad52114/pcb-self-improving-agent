@@ -36,7 +36,11 @@ memory.checkpointer()  # Person 3
 ```bash
 python -m scripts.bootstrap_memory   # needs MONGODB_URI + VOYAGE_API_KEY
 python -m scripts.demo_retrieve
+python -m scripts.demo_atlas_memory  # complete Person 1 sponsor demo
 ```
+
+See [`PERSON_1_MONGODB_HANDOFF.md`](./PERSON_1_MONGODB_HANDOFF.md) for the
+judge-facing Atlas story and the exact boundaries with Persons 2 and 3.
 
 ## Stack
 

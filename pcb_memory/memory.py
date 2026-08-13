@@ -15,6 +15,7 @@ Deep Atlas usage:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from time import monotonic, sleep
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -49,8 +50,17 @@ class AgentMemory:
         self.run_summaries = self.db["run_summaries"]
         self.checkpoints = self.db["langgraph_checkpoints"]
 
-    def bootstrap(self) -> dict[str, Any]:
-        """Create collections, validators, indexes, and Atlas Search indexes."""
+    def bootstrap(
+        self,
+        *,
+        wait_for_search: bool = False,
+        search_timeout_s: float = 60.0,
+    ) -> dict[str, Any]:
+        """Create collections, validators, indexes, and Atlas Search indexes.
+
+        Atlas builds Search indexes asynchronously. Demo scripts can opt into waiting;
+        library consumers can bootstrap without blocking their process startup.
+        """
         created = []
         for name, validator in (
             ("experiments", EXPERIMENT_VALIDATOR),
@@ -75,9 +85,12 @@ class AgentMemory:
         self.lessons.create_index([("defect_family", ASCENDING), ("outcome", ASCENDING)])
         self.run_summaries.create_index([("run_id", ASCENDING)], unique=True)
 
+        existing_search_indexes = {
+            index.get("name") for index in self.lessons.list_search_indexes()
+        }
         search_indexes = []
         for spec in (VECTOR_INDEX, LEXICAL_INDEX):
-            try:
+            if spec["name"] not in existing_search_indexes:
                 self.lessons.create_search_index(
                     SearchIndexModel(
                         definition=spec["definition"],
@@ -85,11 +98,42 @@ class AgentMemory:
                         type=spec["type"],
                     )
                 )
-                search_indexes.append(spec["name"])
-            except OperationFailure as exc:
-                search_indexes.append(f"{spec['name']} (exists or pending: {exc})")
+            search_indexes.append(spec["name"])
 
-        return {"collections": created or "already existed", "search_indexes": search_indexes}
+        search_status = self.search_index_status()
+        if wait_for_search:
+            search_status = self.wait_for_search_indexes(timeout_s=search_timeout_s)
+
+        return {
+            "collections": created or "already existed",
+            "search_indexes": search_indexes,
+            "search_status": search_status,
+        }
+
+    def search_index_status(self) -> dict[str, str]:
+        """Return the latest Atlas Search build status for the lesson indexes."""
+        return {
+            index["name"]: index.get("status", "UNKNOWN")
+            for index in self.lessons.list_search_indexes()
+            if index.get("name") in {VECTOR_INDEX["name"], LEXICAL_INDEX["name"]}
+        }
+
+    def wait_for_search_indexes(
+        self,
+        *,
+        timeout_s: float = 60.0,
+        poll_interval_s: float = 2.0,
+    ) -> dict[str, str]:
+        """Wait until both lesson search indexes are queryable by the demo."""
+        required = {VECTOR_INDEX["name"], LEXICAL_INDEX["name"]}
+        deadline = monotonic() + timeout_s
+        while monotonic() < deadline:
+            status = self.search_index_status()
+            if required.issubset(status) and all(status[name] == "READY" for name in required):
+                return status
+            sleep(poll_interval_s)
+        status = self.search_index_status()
+        raise TimeoutError(f"Atlas Search indexes were not READY after {timeout_s}s: {status}")
 
     def store_experiment(self, data: dict) -> str:
         experiment_id = data.get("experiment_id") or _id("exp")
@@ -129,16 +173,21 @@ class AgentMemory:
 
     def commit_experience(self, experiment: dict, lesson: dict) -> dict[str, str]:
         """Atomic write: experiment + lesson in one transaction."""
+        run_id = experiment.get("run_id") or lesson.get("run_id") or _id("run")
         with self.db.client.start_session() as session:
             with session.start_transaction():
                 experiment_id = experiment.get("experiment_id") or _id("exp")
                 lesson_id = lesson.get("lesson_id") or _id("lesson")
-                experiment = {**experiment, "experiment_id": experiment_id}
+                experiment = {
+                    **experiment,
+                    "experiment_id": experiment_id,
+                    "run_id": run_id,
+                }
                 lesson = {
                     **lesson,
                     "lesson_id": lesson_id,
                     "experiment_id": experiment_id,
-                    "run_id": lesson.get("run_id") or experiment.get("run_id"),
+                    "run_id": run_id,
                 }
                 exp_doc = {
                     **experiment,
@@ -166,7 +215,7 @@ class AgentMemory:
                 self.lessons.replace_one(
                     {"lesson_id": lesson_id}, lesson_doc, upsert=True, session=session
                 )
-        self._refresh_run_summary(experiment.get("run_id") or lesson.get("run_id"))
+        self._refresh_run_summary(run_id)
         return {"experiment_id": experiment_id, "lesson_id": lesson_id}
 
     def retrieve_similar_lessons(
@@ -192,27 +241,29 @@ class AgentMemory:
                     "index": VECTOR_INDEX["name"],
                     "path": "embedding",
                     "queryVector": vector,
-                    "numCandidates": max(50, k * 15),
+                    "numCandidates": max(100, k * 20),
                     "limit": k,
                     **({"filter": vec_filter} if vec_filter else {}),
                 }
             },
-            {"$addFields": {"vs_score": {"$meta": "vectorSearchScore"}}},
         ]
         lexical_must = [{"text": {"query": query, "path": ["failure_summary", "intervention", "result"]}}]
+        lexical_filter = []
         if defect_family:
-            lexical_must.append({"equals": {"path": "defect_family", "value": defect_family}})
+            lexical_filter.append({"equals": {"path": "defect_family", "value": defect_family}})
         if outcome:
-            lexical_must.append({"equals": {"path": "outcome", "value": outcome}})
+            lexical_filter.append({"equals": {"path": "outcome", "value": outcome}})
+        lexical_compound: dict[str, Any] = {"must": lexical_must}
+        if lexical_filter:
+            lexical_compound["filter"] = lexical_filter
         lexical_pipeline = [
             {
                 "$search": {
                     "index": LEXICAL_INDEX["name"],
-                    "compound": {"must": lexical_must},
+                    "compound": lexical_compound,
                 }
             },
             {"$limit": k},
-            {"$addFields": {"lex_score": {"$meta": "searchScore"}}},
         ]
         projection = {
             "$project": {
@@ -236,7 +287,7 @@ class AgentMemory:
                         }
                     },
                     {"$limit": k},
-                    {"$project": {"embedding": 0}},
+                    {"$project": {"embedding": 0, "score": {"$meta": "score"}}},
                 ]
                 return list(self.lessons.aggregate(fusion))
             except OperationFailure:
@@ -288,6 +339,61 @@ class AgentMemory:
             )
         )
 
+    def compare_runs(self, run_ids: list[str], target_f1: float = 0.84) -> list[dict]:
+        """Build the cold-start vs experienced-agent evidence directly in Atlas."""
+        return list(
+            self.experiments.aggregate(
+                [
+                    {
+                        "$match": {
+                            "run_id": {"$in": run_ids},
+                            "metrics.macro_f1": {"$exists": True},
+                        }
+                    },
+                    {"$sort": {"run_id": 1, "iteration": 1, "created_at": 1}},
+                    {
+                        "$group": {
+                            "_id": "$run_id",
+                            "experiment_count": {"$sum": 1},
+                            "baseline_f1": {"$first": "$metrics.macro_f1"},
+                            "final_f1": {"$last": "$metrics.macro_f1"},
+                            "best_f1": {"$max": "$metrics.macro_f1"},
+                            "learning_curve": {
+                                "$push": {
+                                    "iteration": "$iteration",
+                                    "macro_f1": "$metrics.macro_f1",
+                                }
+                            },
+                        }
+                    },
+                    {
+                        "$set": {
+                            "run_id": "$_id",
+                            "first_target_iteration": {
+                                "$min": {
+                                    "$map": {
+                                        "input": {
+                                            "$filter": {
+                                                "input": "$learning_curve",
+                                                "as": "point",
+                                                "cond": {
+                                                    "$gte": ["$$point.macro_f1", target_f1]
+                                                },
+                                            }
+                                        },
+                                        "as": "point",
+                                        "in": "$$point.iteration",
+                                    }
+                                }
+                            },
+                        }
+                    },
+                    {"$project": {"_id": 0}},
+                    {"$sort": {"run_id": 1}},
+                ]
+            )
+        )
+
     def watch_lessons(self) -> Iterator[dict]:
         """Change stream — Person 3 can react as soon as a lesson is written."""
         with self.lessons.watch([{"$match": {"operationType": {"$in": ["insert", "replace", "update"]}}}]) as stream:
@@ -298,7 +404,12 @@ class AgentMemory:
         """LangGraph MongoDB checkpointer (Person 3 wires this into the graph)."""
         from langgraph.checkpoint.mongodb import MongoDBSaver
 
-        return MongoDBSaver(self.db.client, db_name=self.db.name, collection_name="langgraph_checkpoints")
+        return MongoDBSaver(
+            self.db.client,
+            db_name=self.db.name,
+            checkpoint_collection_name="langgraph_checkpoints",
+            writes_collection_name="langgraph_checkpoint_writes",
+        )
 
     def _refresh_run_summary(self, run_id: str | None) -> None:
         if not run_id:
@@ -307,6 +418,7 @@ class AgentMemory:
             self.experiments.aggregate(
                 [
                     {"$match": {"run_id": run_id}},
+                    {"$sort": {"iteration": 1, "updated_at": 1}},
                     {
                         "$group": {
                             "_id": "$run_id",

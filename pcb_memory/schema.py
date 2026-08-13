@@ -1,13 +1,17 @@
 """JSON Schema validators — keep agent memory documents consistent."""
 
+NUMBER_TYPES = ["double", "int", "long", "decimal"]
+F1_SCORE = {"bsonType": NUMBER_TYPES, "minimum": 0, "maximum": 1}
+
+
 EXPERIMENT_VALIDATOR = {
     "$jsonSchema": {
         "bsonType": "object",
         "required": ["experiment_id", "run_id", "status", "created_at"],
         "properties": {
-            "experiment_id": {"bsonType": "string"},
-            "run_id": {"bsonType": "string"},
-            "iteration": {"bsonType": ["int", "long"]},
+            "experiment_id": {"bsonType": "string", "minLength": 1},
+            "run_id": {"bsonType": "string", "minLength": 1},
+            "iteration": {"bsonType": ["int", "long"], "minimum": 0},
             "dataset_stats": {"bsonType": "object"},
             "model_config": {"bsonType": "object"},
             "metrics": {"bsonType": "object"},
@@ -16,7 +20,9 @@ EXPERIMENT_VALIDATOR = {
             "intervention": {"bsonType": "object"},
             "outcome_delta": {"bsonType": "object"},
             "status": {"enum": ["proposed", "running", "complete", "failed"]},
-            "schema_version": {"bsonType": ["int", "long"]},
+            "schema_version": {"bsonType": ["int", "long"], "minimum": 1},
+            "created_at": {"bsonType": "date"},
+            "updated_at": {"bsonType": "date"},
         },
     }
 }
@@ -33,20 +39,26 @@ LESSON_VALIDATOR = {
             "created_at",
         ],
         "properties": {
-            "lesson_id": {"bsonType": "string"},
-            "run_id": {"bsonType": "string"},
-            "experiment_id": {"bsonType": "string"},
-            "failure_summary": {"bsonType": "string"},
-            "intervention": {"bsonType": "string"},
+            "lesson_id": {"bsonType": "string", "minLength": 1},
+            "run_id": {"bsonType": "string", "minLength": 1},
+            "experiment_id": {"bsonType": "string", "minLength": 1},
+            "failure_summary": {"bsonType": "string", "minLength": 1},
+            "intervention": {"bsonType": "string", "minLength": 1},
             "result": {"bsonType": "string"},
             "outcome": {"enum": ["helped", "failed", "mixed"]},
-            "defect_family": {"bsonType": "string"},
-            "before_f1": {"bsonType": ["double", "int", "long", "decimal"]},
-            "after_f1": {"bsonType": ["double", "int", "long", "decimal"]},
-            "delta": {"bsonType": ["double", "int", "long", "decimal"]},
-            "confidence": {"bsonType": ["double", "int", "long", "decimal"]},
-            "embedding": {"bsonType": "array"},
-            "schema_version": {"bsonType": ["int", "long"]},
+            "defect_family": {"bsonType": "string", "minLength": 1},
+            "before_f1": F1_SCORE,
+            "after_f1": F1_SCORE,
+            "delta": {"bsonType": NUMBER_TYPES, "minimum": -1, "maximum": 1},
+            "confidence": F1_SCORE,
+            "embedding": {
+                "bsonType": "array",
+                "minItems": 1024,
+                "maxItems": 1024,
+                "items": {"bsonType": NUMBER_TYPES},
+            },
+            "schema_version": {"bsonType": ["int", "long"], "minimum": 1},
+            "created_at": {"bsonType": "date"},
         },
     }
 }

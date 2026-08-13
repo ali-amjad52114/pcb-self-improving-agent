@@ -61,22 +61,24 @@ SEED_LESSONS = [
 
 def main() -> None:
     memory = AgentMemory()
-    info = memory.bootstrap()
+    info = memory.bootstrap(wait_for_search=True)
     print("bootstrap:", json.dumps(info, default=str))
     ids = []
-    for lesson in SEED_LESSONS:
-        ids.append(memory.store_lesson(lesson))
-        memory.store_experiment(
-            {
+    for iteration, lesson in enumerate(SEED_LESSONS, start=1):
+        committed = memory.commit_experience(
+            experiment={
                 "run_id": lesson["run_id"],
+                "iteration": iteration,
                 "status": "complete",
                 "metrics": {"macro_f1": lesson["after_f1"]},
                 "failure_signature": {"text": lesson["failure_summary"]},
                 "intervention": {"text": lesson["intervention"]},
                 "outcome_delta": {"macro_f1": lesson["delta"]},
-            }
+            },
+            lesson=lesson,
         )
-    print("seeded lessons:", ids)
+        ids.append(committed)
+    print("seeded experiences:", ids)
     query = "Small open circuits have low recall and class imbalance"
     hits = memory.retrieve_similar_lessons(query, k=3)
     print("retrieve:", json.dumps(hits, default=str, indent=2)[:4000])
