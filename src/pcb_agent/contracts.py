@@ -27,9 +27,17 @@ JUDGE_FALLBACK: dict[str, Any] = {
     "reasoning_summary": (
         "Independent evaluator unavailable; proceeding with primary scientist proposal."
     ),
+    "evidence_citations": [],
+    "suggested_action_family": "",
+    "suggested_action_allowed": False,
+    "lesson_quality": "adequate",
+    "panel": [],
+    "agreement_rate": 0.0,
+    "dissent_summary": "",
 }
 
 METRIC_EPSILON = 1e-6
+LESSON_QUALITY_VALUES = {"weak", "adequate", "strong"}
 
 
 class IntegrationError(Exception):
@@ -51,6 +59,13 @@ class JudgeOpinion(BaseModel):
     risk_flags: list[str] = Field(default_factory=list)
     recommendation: str = Field(pattern="^(proceed|reconsider)$")
     reasoning_summary: str = ""
+    evidence_citations: list[str] = Field(default_factory=list)
+    suggested_action_family: str = ""
+    suggested_action_allowed: bool = False
+    lesson_quality: str = Field(default="adequate", pattern="^(weak|adequate|strong)$")
+    panel: list[dict[str, Any]] = Field(default_factory=list)
+    agreement_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    dissent_summary: str = ""
 
 
 @runtime_checkable
@@ -186,10 +201,35 @@ def normalize_critique(
 
 
 def normalize_judge(raw: dict[str, Any] | None) -> dict[str, Any]:
+    raw = dict(raw or {})
+    suggested = str(raw.get("suggested_action_family") or "")
+    if suggested and suggested not in ALLOWED_ACTIONS:
+        raw["suggested_action_family"] = ""
+        raw["suggested_action_allowed"] = False
+    elif suggested:
+        raw["suggested_action_allowed"] = True
+    else:
+        raw["suggested_action_allowed"] = False
+
+    quality = str(raw.get("lesson_quality") or "adequate")
+    if quality not in LESSON_QUALITY_VALUES:
+        raw["lesson_quality"] = "adequate"
+
     try:
-        return JudgeOpinion.model_validate(raw or {}).model_dump()
+        return JudgeOpinion.model_validate(raw).model_dump()
     except Exception:
-        return dict(JUDGE_FALLBACK)
+        fallback = dict(JUDGE_FALLBACK)
+        # Preserve useful risk flags from a partial/malformed payload when present.
+        flags = raw.get("risk_flags")
+        if isinstance(flags, list) and flags:
+            fallback["risk_flags"] = [str(f) for f in flags]
+        return fallback
+
+
+def lesson_quality_confidence_multiplier(quality: str | None) -> float:
+    """Annotate stored lesson confidence from judge lesson_quality (no metric invention)."""
+    mapping = {"weak": 0.85, "adequate": 1.0, "strong": 1.05}
+    return mapping.get(str(quality or "adequate"), 1.0)
 
 
 def metric_value(metrics: dict[str, Any] | None, name: str) -> float:

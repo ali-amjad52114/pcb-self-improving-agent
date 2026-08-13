@@ -21,6 +21,7 @@ def _settings(**overrides) -> Settings:
         "experiment_budget": 4,
         "checkpointer_backend": "memory",
         "openrouter_enabled": False,
+        "openrouter_call_budget": 5,
         "memory_top_k": 5,
     }
     base.update(overrides)
@@ -74,7 +75,10 @@ def _initial(run_id: str, settings: Settings) -> dict:
         "warnings": [],
         "pending_experiment_id": "",
         "openrouter_calls": 0,
+        "openrouter_call_budget": settings.openrouter_call_budget,
+        "openrouter_ledger": [],
         "judge_skipped": False,
+        "judge_skip_reason": "",
     }
 
 

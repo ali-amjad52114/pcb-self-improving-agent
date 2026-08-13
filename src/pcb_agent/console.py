@@ -100,26 +100,53 @@ def print_experiment(proposal: dict[str, Any], *, memory_changed: bool = False) 
         _safe_print("Past experience changed the next experiment.")
 
 
-def print_judge_skipped() -> None:
+def print_judge_skipped(reason: str = "scientist confidence sufficient") -> None:
     _safe_print("\nJUDGE")
-    _safe_print("skipped     scientist confidence sufficient")
-    _safe_print("[JUDGE] skipped — scientist confidence sufficient")
+    _safe_print(f"skipped     {reason}")
+    _safe_print(f"[JUDGE] skipped — {reason}")
 
 
-def print_judge_result(reason: str, opinion: dict[str, Any]) -> None:
+def print_judge_result(
+    reason: str,
+    opinion: dict[str, Any],
+    *,
+    calls: int | None = None,
+    budget: int | None = None,
+) -> None:
     _safe_print("\nJUDGE")
     _safe_print(f"triggered   reason={reason}")
+    panel = opinion.get("panel") or []
+    if panel:
+        models = ",".join(str(p.get("model") or "?") for p in panel)
+        reconsider_n = sum(
+            1 for p in panel if p.get("recommendation") == "reconsider"
+        )
+        agreement = float(opinion.get("agreement_rate") or 0.0)
+        _safe_print(
+            f"[JUDGE PANEL] models={models} agreement={agreement:.2f} "
+            f"reconsider={reconsider_n}/{len(panel)}"
+        )
+        if opinion.get("recommendation") == "reconsider":
+            _safe_print(
+                f"[JUDGE PANEL] {reconsider_n}/{len(panel)} reconsider — "
+                "routing may revise proposal"
+            )
+    suggested = opinion.get("suggested_action_family") or ""
     _safe_print(
         f"verdict     {opinion.get('verdict')} "
         f"confidence={float(opinion.get('confidence') or 0):.2f} "
         f"recommendation={opinion.get('recommendation')}"
+        + (f" suggested={suggested}" if suggested else "")
     )
     _safe_print(f"[JUDGE] triggered reason={reason}")
     _safe_print(
         f"[JUDGE] verdict={opinion.get('verdict')} "
         f"confidence={float(opinion.get('confidence') or 0):.2f} "
         f"recommendation={opinion.get('recommendation')}"
+        + (f" suggested={suggested}" if suggested else "")
     )
+    if calls is not None and budget is not None:
+        _safe_print(f"[JUDGE] budget {calls}/{budget} used")
 
 
 def print_result(
@@ -170,6 +197,15 @@ def print_run_complete(
     history = state.get("experiment_history") or []
     lessons_used = sum(len(h.get("memory_used") or []) for h in history)
     budget = int(state.get("experiment_budget") or 0)
+    or_calls = int(state.get("openrouter_calls") or 0)
+    or_budget = int(state.get("openrouter_call_budget") or 0)
+    panel_sizes = [
+        len((h.get("independent_evaluation") or {}).get("panel") or [])
+        for h in history
+    ]
+    # Prefer last evaluator opinion panel size for summary.
+    last_panel = len((state.get("evaluator_opinion") or {}).get("panel") or [])
+    panel_note = last_panel or (max(panel_sizes) if panel_sizes else 0)
     _safe_print(
         "\n+================ RUN COMPLETE =================+\n"
         f"Run                  {state.get('run_id')}\n"
@@ -178,7 +214,10 @@ def print_run_complete(
         f"Best macro F1         {best:.3f}\n"
         f"Experiments used      {len(history)} / {budget}\n"
         f"Memory lessons used   {lessons_used}\n"
-        f"OpenRouter calls      {int(state.get('openrouter_calls') or 0)}\n"
+        f"OpenRouter calls      {or_calls}"
+        + (f" / {or_budget}" if or_budget else "")
+        + "\n"
+        f"Judge panel size      {panel_note}\n"
         f"Checkpoint backend    {checkpoint_backend}\n"
         "+================================================+"
     )

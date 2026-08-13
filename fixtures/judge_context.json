@@ -1,0 +1,50 @@
+{
+  "stage": "proposal_review",
+  "run_id": "smoke_001",
+  "iteration": 2,
+  "trigger": "two_consecutive_failures",
+  "dataset_summary": {
+    "class_imbalance_ratio": 5.4,
+    "minority_class": "open_circuit"
+  },
+  "current_metrics": {
+    "macro_f1": 0.61,
+    "accuracy": 0.65
+  },
+  "recent_history": [
+    {
+      "experiment_id": "smoke_001_exp_001",
+      "proposal": {"next_action": "change_learning_rate"},
+      "helped": false,
+      "delta": -0.01
+    },
+    {
+      "experiment_id": "smoke_001_exp_002",
+      "proposal": {"next_action": "change_batch_size"},
+      "helped": false,
+      "delta": -0.02
+    }
+  ],
+  "retrieved_lessons": [
+    {
+      "lesson_id": "lesson_12",
+      "failure_summary": "Poor recall on minority open-circuit class",
+      "intervention": "weighted sampler",
+      "result": "+0.09 macro F1",
+      "helped": true
+    }
+  ],
+  "diagnosis": {
+    "summary": "Open-circuit recall is poor because minority samples are underrepresented",
+    "confidence": 0.55,
+    "evidence": ["open_circuit recall = 0.41", "class imbalance ratio = 5.4"]
+  },
+  "proposal": {
+    "diagnosis": "Minority classes are underrepresented",
+    "hypothesis": "Larger batches may reduce gradient noise",
+    "next_action": "change_batch_size",
+    "parameters": {"batch_size": 128},
+    "expected_effect": "Improve accuracy",
+    "confidence": 0.5
+  }
+}

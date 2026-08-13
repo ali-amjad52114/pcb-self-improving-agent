@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from pcb_agent import console
-from pcb_agent.contracts import metric_value
+from pcb_agent.contracts import metric_value, lesson_quality_confidence_multiplier
 from pcb_agent.dependencies import AgentDependencies
 from pcb_agent.routing import stop_reason_for
 from pcb_agent.state import AgentState
@@ -31,6 +31,12 @@ def make_store_experience(
         before = metric_value(state.get("previous_metrics"), target_metric)
         after = metric_value(state.get("current_metrics"), target_metric)
         delta = float(state.get("last_metric_delta") or (after - before))
+        evaluator = state.get("evaluator_opinion") or {}
+        quality = str(evaluator.get("lesson_quality") or "adequate")
+        base_confidence = float(lesson_body.get("confidence") or 0.0)
+        annotated_confidence = min(
+            1.0, base_confidence * lesson_quality_confidence_multiplier(quality)
+        )
 
         experiment_payload = {
             "experiment_id": experiment_id,
@@ -62,7 +68,8 @@ def make_store_experience(
             or "",
             "result": lesson_body.get("result")
             or f"{'+' if delta >= 0 else ''}{delta:.2f} macro F1",
-            "confidence": float(lesson_body.get("confidence") or 0.0),
+            "confidence": annotated_confidence,
+            "lesson_quality": quality,
             "helped": helped,
             "outcome": "helped" if helped else "failed",
             "before_f1": before,
