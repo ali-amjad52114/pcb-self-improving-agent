@@ -1,65 +1,127 @@
 # PCB Self-Improving Agent
 
-Backend-only agent for the [MongoDB Persistent Context Sprint](https://cerebralvalley.ai/e/persistent-context-sprint-hackathon) at `.local` Build Fest (Aug 13, 2026).
+Backend-only agent for the MongoDB Persistent Context Sprint. The classifier is
+the task; the product is an agent that gets better at improving PCB defect
+classifiers over time.
 
-The classifier is the task. The product is an agent that gets better at improving PCB defect classifiers over time:
+```text
+Train → Evaluate → Retrieve Atlas memory → Diagnose → Choose experiment
+      → Retrain → Critique → Store lesson → Repeat
+```
 
-**Train → Evaluate → Diagnose → Retrieve past experience → Choose next experiment → Retrain → Store lesson**
+## Integrated architecture
 
-MongoDB Atlas holds experiment history, failure memory, and vector-search retrieval so the agent does not cold-start.
+```text
+                   LangGraph (Person 3)
+                          │
+             ┌────────────┼────────────┐
+             ↓            ↓            ↓
+       MongoDB Atlas   Fireworks    OpenRouter
+        (Person 1)     (Person 2)   (Person 3)
+             ↑            │
+             └── experiment outcome ┘
+```
 
-See [`PCB_AGENT_3_PERSON_BACKEND_PLAN.md`](./PCB_AGENT_3_PERSON_BACKEND_PLAN.md) for the 3-person backend split.
+MongoDB Atlas is the agent's long-term experience, not just a log. It stores
+validated experiments and lessons, Voyage embeddings, hybrid Vector Search,
+computed run evidence, and LangGraph checkpoints.
 
-## Person 1 — MongoDB memory (this repo)
+Long-term experience and graph checkpoints are separate concerns:
 
-Atlas is the agent's long-term experience, not a log. The memory layer uses:
+| Concern | Data | Owner |
+| --- | --- | --- |
+| Long-term experience | experiments, lessons, retrieval, run analytics | Person 1 |
+| Workflow checkpoint | graph/node state and crash recovery | Person 3 |
 
-- JSON Schema validation on `experiments` and `lessons`
-- Voyage `voyage-3-large` embeddings (1024-d) + Vector Search
-- Atlas Search lexical index + `$rankFusion` hybrid retrieval
-- Transactions when committing an experiment and lesson together
-- Computed `run_summaries` and aggregations (`get_run_history`, `best_interventions`)
-- Change streams on `lessons`
-- LangGraph MongoDB checkpointer helper for Person 3
+## Person 1 — MongoDB memory
 
 ```python
 from pcb_memory import AgentMemory
 
 memory = AgentMemory()
 memory.bootstrap()
-memory.store_lesson({...})
-memory.retrieve_similar_lessons("Small open circuits have low recall and class imbalance")
-memory.get_run_history("run_cold_start_demo")
-memory.checkpointer()  # Person 3
+memory.retrieve_similar_lessons("Small open circuits have low recall")
+memory.commit_experience(experiment, lesson)
+memory.get_run_history("run_001")
+memory.compare_runs(["run_cold", "run_warm"])
+memory.checkpointer()
 ```
 
-```bash
-python -m scripts.bootstrap_memory   # needs MONGODB_URI + VOYAGE_API_KEY
-python -m scripts.demo_retrieve
-python -m scripts.demo_atlas_memory  # complete Person 1 sponsor demo
+Live Atlas sponsor demo:
+
+```powershell
+python -m scripts.demo_atlas_memory
 ```
 
-See [`PERSON_1_MONGODB_HANDOFF.md`](./PERSON_1_MONGODB_HANDOFF.md) for the
-judge-facing Atlas story and the exact boundaries with Persons 2 and 3.
+See [PERSON_1_MONGODB_HANDOFF.md](./PERSON_1_MONGODB_HANDOFF.md) for the exact
+contract and judge-facing story.
 
-## Stack
+## Person 3 — LangGraph orchestrator
 
-- MongoDB Atlas sandbox (Vector Search + LangGraph checkpointer)
-- LangChain / LangGraph
-- Fireworks (code `MONGODB813`)
-- OpenRouter, ElevenLabs, LangSmith (partner credits)
+Graph topology:
 
-## Setup
+```text
+START → train_baseline → evaluate_baseline → retrieve_memory → diagnose
+  → propose_experiment → optional proposal judge → run_experiment
+  → evaluate_result → critique_result → optional lesson judge
+  → store_experience → stop or retrieve_memory
+```
 
-```bash
-cp .env.example .env
-# fill MONGODB_URI and partner keys
+Run the orchestration locally with fake teammate adapters:
 
+```powershell
+python -m pcb_agent.runner start --run-id demo_001
+python -m pcb_agent.runner resume --run-id demo_001
+```
+
+Optional baseline configuration:
+
+```powershell
+python -m pcb_agent.runner start --run-id run_cold_001 --config .\configs\baseline.json
+```
+
+## Integrated mode
+
+Set these values in `.env` after Person 2 supplies their modules:
+
+```env
+AGENT_MODE=integrated
+MEMORY_MODULE=pcb_memory.memory
+ML_MODULE=<person-2-ml-module>
+REASONING_MODULE=<person-2-reasoning-module>
+
+CHECKPOINTER_BACKEND=mongodb
+MONGODB_DB=persistent_context
+MONGODB_DB_NAME=persistent_context
+
+OPENROUTER_ENABLED=true
+OPENROUTER_MODEL=<model-name>
+```
+
+Then run:
+
+```powershell
+python -m pcb_agent.runner start --run-id integrated_001
+```
+
+The graph, routing, and state do not change when switching from fakes to real
+teammate modules.
+
+## OpenRouter policy
+
+Person 3 calls the independent judge only for low confidence, repeated failures,
+model-family changes, or final lesson validation. Failures fall back safely so
+the experiment loop can continue.
+
+## Setup and tests
+
+```powershell
 python -m venv .venv
-.\.venv\Scripts\activate   # Windows
+.\.venv\Scripts\activate
+pip install -e .
 pip install -r requirements.txt
-
-npm install
+python -m unittest discover -s tests -v
+pytest -q
 ```
 
-Do not commit `.env`. The hackathon build must live in the Atlas Hackathon Sandbox to be eligible for finalists.
+The real build must use the Atlas Hackathon Sandbox. Never commit `.env`.

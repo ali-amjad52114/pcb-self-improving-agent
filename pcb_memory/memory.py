@@ -267,7 +267,9 @@ class AgentMemory:
         ]
         projection = {
             "$project": {
+                "_id": 0,
                 "embedding": 0,
+                "created_at": 0,
                 "score": {"$meta": "vectorSearchScore"},
             }
         }
@@ -287,7 +289,14 @@ class AgentMemory:
                         }
                     },
                     {"$limit": k},
-                    {"$project": {"embedding": 0, "score": {"$meta": "score"}}},
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "embedding": 0,
+                            "created_at": 0,
+                            "score": {"$meta": "score"},
+                        }
+                    },
                 ]
                 return list(self.lessons.aggregate(fusion))
             except OperationFailure:
@@ -456,6 +465,10 @@ def store_experiment(data: dict) -> str:
 
 def store_lesson(data: dict) -> str:
     return AgentMemory().store_lesson(data)
+
+
+def commit_experience(experiment: dict, lesson: dict) -> dict[str, str]:
+    return AgentMemory().commit_experience(experiment, lesson)
 
 
 def retrieve_similar_lessons(query: str, k: int = 5) -> list:

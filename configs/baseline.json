@@ -1,0 +1,10 @@
+{
+  "model_family": "resnet18",
+  "learning_rate": 0.001,
+  "batch_size": 32,
+  "image_size": 224,
+  "augmentation": "basic",
+  "sampler": "random",
+  "class_weights": null,
+  "confidence_threshold": 0.5
+}
