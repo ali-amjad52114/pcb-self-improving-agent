@@ -16,7 +16,6 @@
     "@langchain/mongodb": "^1.0.1",
     "@langchain/openai": "^1.2.13",
     "dotenv": "^17.2.3",
-    "elevenlabs": "^1.59.0",
     "mongodb": "^6.21.0"
   }
 }

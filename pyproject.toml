@@ -1,14 +1,13 @@
 [project]
 name = "pcb-self-improving-agent"
 version = "0.1.0"
-description = "Person 3 LangGraph orchestrator for a self-improving PCB defect classification agent"
+description = "Traceboard: a MongoDB-powered self-improving PCB defect experimentation agent"
 readme = "README.md"
 authors = [
     { name = "wh0am1", email = "48444630+wh0th3h3llam1@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "elevenlabs>=1.50",
     "httpx>=0.28.1",
     "kagglehub>=0.3.13",
     "langchain>=0.3",
@@ -17,6 +16,7 @@ dependencies = [
     "langchain-voyageai>=0.1",
     "langgraph>=1.2.11",
     "langgraph-checkpoint-mongodb>=0.4.0",
+    "langsmith>=0.4",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
     "numpy>=2.0",

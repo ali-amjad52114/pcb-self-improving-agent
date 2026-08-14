@@ -5,6 +5,6 @@ langchain-openai>=0.3
 langgraph>=0.6
 langgraph-checkpoint-mongodb>=0.1
 python-dotenv>=1.1
-elevenlabs>=1.50
+langsmith>=0.4
 voyageai>=0.3
 langchain-voyageai>=0.1

@@ -5,8 +5,14 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# LangGraph/LangSmith read tracing configuration directly from os.environ.
+# Load .env before graph construction; existing shell variables keep priority.
+load_dotenv(override=False)
 
 
 class Settings(BaseSettings):

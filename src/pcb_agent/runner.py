@@ -142,7 +142,12 @@ def start(
         dataset_summary=dataset_summary,
         memory_mode=mode,
     )
-    thread_config = {"configurable": {"thread_id": run_id}}
+    thread_config = {
+        "configurable": {"thread_id": run_id},
+        "run_name": "pcb-agent-campaign",
+        "tags": ["pcb-agent", f"mode:{mode}"],
+        "metadata": {"pcb_run_id": run_id, "memory_mode": mode},
+    }
 
     console.print_run_banner(run_id)
     backend = settings.checkpointer_backend
@@ -187,7 +192,12 @@ def resume(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc
 
-    thread_config = {"configurable": {"thread_id": run_id}}
+    thread_config = {
+        "configurable": {"thread_id": run_id},
+        "run_name": "pcb-agent-resume",
+        "tags": ["pcb-agent", "resume"],
+        "metadata": {"pcb_run_id": run_id},
+    }
     console.print_checkpoint_resumed(run_id)
 
     try:
