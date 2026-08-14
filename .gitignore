@@ -7,3 +7,7 @@ __pycache__/
 .python-version
 dist/
 .DS_Store
+
+# Fireworks layer
+.pytest_cache/
+.omc/
