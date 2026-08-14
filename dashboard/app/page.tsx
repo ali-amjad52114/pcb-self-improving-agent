@@ -105,8 +105,8 @@ const classMetrics = [
 export default function Home() {
   const [runs, setRuns] = useState(initialRuns);
   const [selected, setSelected] = useState("Run #12");
-  const [memoryMode, setMemoryMode] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [runningMode, setRunningMode] = useState<"memory" | "cold" | null>(null);
   const [activeStage, setActiveStage] = useState("memory");
   const [zoom, setZoom] = useState(1);
   const [connection, setConnection] = useState<"checking" | "live" | "demo">("checking");
@@ -142,6 +142,11 @@ export default function Home() {
   const dataset = object(selectedState.dataset_summary);
   const critique = object(selectedState.critique);
   const lesson = object(critique.lesson);
+  const latestCold = runs.find((run) => run.mode === "COLD" && run.status !== "running");
+  const latestMemory = runs.find((run) => run.mode === "MEMORY" && run.status !== "running");
+  const comparisonDelta = latestCold && latestMemory
+    ? number(latestMemory.f1) - number(latestCold.f1)
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +164,7 @@ export default function Home() {
           setRuns(normalized);
           setSelected(normalized[0].id);
           setIsRunning(normalized.some((run) => run.status === "running"));
+          setRunningMode(normalized.find((run) => run.status === "running")?.mode === "COLD" ? "cold" : normalized.some((run) => run.status === "running") ? "memory" : null);
           setActiveStage(stageFor(normalized[0].raw));
         }
       } catch {
@@ -178,7 +184,10 @@ export default function Home() {
         const updated = normalizeRun(await getApiRun(running.id));
         setRuns((current) => current.map((run) => run.id === running.id ? updated : run));
         setActiveStage(stageFor(updated.raw));
-        if (updated.status !== "running") setIsRunning(false);
+        if (updated.status !== "running") {
+          setIsRunning(false);
+          setRunningMode(null);
+        }
       } catch {
         // A transient poll failure does not discard live data or switch modes.
       }
@@ -186,12 +195,12 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [connection, runs]);
 
-  function launchDemoRun() {
+  function launchDemoRun(mode: "memory" | "cold") {
     if (isRunning) return;
     const id = `Run #${Number(runs[0].id.replace(/\D/g, "")) + 1}`;
     const next: Run = {
       id,
-      mode: memoryMode ? "MEMORY" : "COLD",
+      mode: mode === "memory" ? "MEMORY" : "COLD",
       time: new Date().toLocaleTimeString([], { hour12: false }),
       status: "running",
       f1: ".710",
@@ -201,6 +210,7 @@ export default function Home() {
     setRuns((current) => [next, ...current]);
     setSelected(id);
     setIsRunning(true);
+    setRunningMode(mode);
     setActiveStage("data");
     const sequence = ["train", "eval", "memory", "science", "experiment", "critic"];
     sequence.forEach((key, index) => {
@@ -210,32 +220,40 @@ export default function Home() {
       setRuns((current) =>
         current.map((run) =>
           run.id === id
-            ? { ...run, status: "complete", f1: ".749", action: "Increase epochs", delta: "+.039" }
+            ? mode === "memory"
+              ? { ...run, status: "complete", f1: ".749", action: "Increase epochs", delta: "+.039" }
+              : { ...run, status: "complete", f1: ".710", action: "Baseline only", delta: "—" }
             : run,
         ),
       );
       setIsRunning(false);
+      setRunningMode(null);
     }, 5000);
   }
 
-  async function launchRun() {
+  async function launchRun(mode: "memory" | "cold") {
     if (isRunning) return;
     if (connection !== "live") {
-      launchDemoRun();
+      launchDemoRun(mode);
       return;
     }
     setIsRunning(true);
+    setRunningMode(mode);
     setActiveStage("data");
     try {
-      const next = normalizeRun(await startApiRun(memoryMode ? "memory" : "cold"));
+      const next = normalizeRun(await startApiRun(mode));
       setRuns((current) => [next, ...current.filter((run) => run.id !== next.id)]);
       setSelected(next.id);
       setActiveStage(stageFor(next.raw));
-      if (next.status !== "running") setIsRunning(false);
+      if (next.status !== "running") {
+        setIsRunning(false);
+        setRunningMode(null);
+      }
     } catch {
       setConnection("demo");
       setIsRunning(false);
-      launchDemoRun();
+      setRunningMode(null);
+      launchDemoRun(mode);
     }
   }
 
@@ -270,22 +288,31 @@ export default function Home() {
               <div className="tag-row"><span>Macro F1</span><span>Memory</span><span>Real data</span></div>
             </section>
 
-            <section className="mode-card">
-              <div>
-                <h2>{memoryMode ? "Experienced agent" : "Cold start"}</h2>
-                <p>{memoryMode ? "Atlas lessons shape the next move" : "No historical lessons retrieved"}</p>
-              </div>
-              <button
-                className={`toggle ${memoryMode ? "on" : ""}`}
-                onClick={() => setMemoryMode((value) => !value)}
-                aria-label="Toggle memory mode"
-                aria-pressed={memoryMode}
-              ><span /></button>
+            <section className="mode-card compare-intro">
+              <div><h2>Run the comparison</h2><p>Same data and model; only Atlas memory changes.</p></div>
             </section>
 
-            <button className={`run-button ${isRunning ? "busy" : ""}`} onClick={launchRun} type="button">
-              <span>{isRunning ? "◆" : "▶"}</span>{isRunning ? " Agent running" : " Start autonomous run"}
-            </button>
+            <div className="run-choice" aria-label="Choose comparison run">
+              <button className={`run-button cold ${runningMode === "cold" ? "busy" : ""}`} onClick={() => launchRun("cold")} disabled={isRunning} type="button">
+                <span>{runningMode === "cold" ? "◆" : "○"}</span><b>Run Cold</b><small>No past lessons</small>
+              </button>
+              <button className={`run-button memory ${runningMode === "memory" ? "busy" : ""}`} onClick={() => launchRun("memory")} disabled={isRunning} type="button">
+                <span>{runningMode === "memory" ? "◆" : "◇"}</span><b>Run With Memory</b><small>Atlas-guided</small>
+              </button>
+            </div>
+
+            <section className="quick-compare" aria-label="Cold versus memory comparison">
+              <div className="compare-head"><span>LAST RESULTS</span>{comparisonDelta !== null && <b className={comparisonDelta >= 0 ? "positive" : "negative"}>{comparisonDelta >= 0 ? "+" : ""}{comparisonDelta.toFixed(3)} F1 with memory</b>}</div>
+              <div className="compare-columns">
+                <button type="button" onClick={() => latestCold && setSelected(latestCold.id)} disabled={!latestCold}>
+                  <small>COLD</small><strong>{latestCold?.f1 ?? "—"}</strong><span>0 lessons</span>
+                </button>
+                <div className="versus">VS</div>
+                <button type="button" onClick={() => latestMemory && setSelected(latestMemory.id)} disabled={!latestMemory}>
+                  <small>WITH MEMORY</small><strong>{latestMemory?.f1 ?? "—"}</strong><span>{latestMemory ? `${((object(latestMemory.raw?.state ?? latestMemory.raw).retrieved_lessons as unknown[]) ?? []).length || 5} lessons` : "—"}</span>
+                </button>
+              </div>
+            </section>
             <button className="secondary-button" type="button" onClick={() => setActiveStage("science")}>Inspect next decision</button>
 
             <div className="section-title"><span className="dot orange" /> DATASET</div>

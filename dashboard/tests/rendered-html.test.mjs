@@ -31,7 +31,8 @@ test("server-renders the Traceboard observatory", async () => {
   const html = await response.text();
   assert.match(html, /<title>Traceboard/);
   assert.match(html, /PCB Autonomous Lab/);
-  assert.match(html, /Start autonomous run/);
+  assert.match(html, /Run Cold/);
+  assert.match(html, /Run With Memory/);
   assert.match(html, /Kaggle PCB defects/);
   assert.match(html, /2,953/);
   assert.match(html, /MongoDB|Atlas/);
@@ -49,6 +50,9 @@ test("ships live API wiring with an explicit demo fallback", async () => {
   ]);
 
   assert.match(page, /Live API/);
+  assert.match(page, /Run Cold/);
+  assert.match(page, /Run With Memory/);
+  assert.match(page, /Cold versus memory comparison/);
   assert.match(page, /launchDemoRun/);
   assert.match(page, /startApiRun/);
   assert.match(client, /\/api\/backend/);
